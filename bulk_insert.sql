@@ -1,0 +1,16 @@
+INSERT INTO user_queue VALUES
+	(1, 'one'),
+	(1, 'two'),
+	(1, 'three'),
+	(1, 'four'),
+	(1, 'five'),
+	(2, 'one'),
+	(2, 'two'),
+	(2, 'three'),
+	(2, 'four'),
+	(2, 'five'),
+	(3, 'one'),
+	(3, 'two'),
+	(3, 'three'),
+	(3, 'four'),
+	(3, 'five');
