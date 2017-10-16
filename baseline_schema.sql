@@ -68,7 +68,7 @@ CREATE OR REPLACE FUNCTION insert_kanji(str text) RETURNS VOID AS $$
 	),
 	-- insert kanji into kanji table
 	ins_k AS (
-		INSERT INTO kanji (kanji) 
+		INSERT INTO kanji (kanji)
 		SELECT char FROM chars
 		WHERE NOT EXISTS (
 			SELECT kanji from kanji WHERE kanji = char
@@ -77,7 +77,7 @@ CREATE OR REPLACE FUNCTION insert_kanji(str text) RETURNS VOID AS $$
 	),
 	-- all kanji_ids (current + inserted above) matching filtered chars
 	char_ids AS (
-		SELECT kanji.id, kanji.kanji FROM kanji, chars 
+		SELECT kanji.id, kanji.kanji FROM kanji, chars
 		WHERE kanji.kanji = chars.char
 		UNION DISTINCT SELECT id, kanji FROM ins_k
 	),
@@ -102,13 +102,13 @@ $$ LANGUAGE SQL;
 
 DROP FUNCTION IF EXISTS add_new_user(new_username text, password text) ;
 CREATE OR REPLACE FUNCTION add_new_user(new_username text, password text) RETURNS record AS $$
-	INSERT INTO users (username, password_hash) 
+	INSERT INTO users (username, password_hash)
 	VALUES ( new_username, crypt(password, gen_salt('bf', 12)) )
 	RETURNING *
 $$ LANGUAGE SQL;
 
 DROP FUNCTION IF EXISTS check_user(name text, password text) ;
-CREATE OR REPLACE FUNCTION check_user(name text, password text) RETURNS record AS $$
+CREATE OR REPLACE FUNCTION check_user(name text, password text) RETURNS SETOF record AS $$
 	SELECT * FROM users
 		WHERE users.username = name
 		AND users.password_hash = ( crypt(password, users.password_hash) )
