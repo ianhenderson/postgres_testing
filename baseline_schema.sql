@@ -60,8 +60,8 @@ CREATE OR REPLACE FUNCTION filter_kanji(str text) RETURNS SETOF text AS $$
 $$ LANGUAGE SQL;
 
 
-DROP FUNCTION IF EXISTS insert_kanji(text) ;
-CREATE OR REPLACE FUNCTION insert_kanji(str text) RETURNS VOID AS $$
+DROP FUNCTION IF EXISTS insert_kanji(str text, username text) ;
+CREATE OR REPLACE FUNCTION insert_kanji(str text, username text) RETURNS VOID AS $$
 	-- filter sentence -> kanji only
 	WITH chars AS (
 		SELECT DISTINCT char FROM filter_kanji(str) AS char
@@ -86,6 +86,16 @@ CREATE OR REPLACE FUNCTION insert_kanji(str text) RETURNS VOID AS $$
 		INSERT INTO words (word)
 		VALUES (str)
 		RETURNING id
+	),
+	-- get user_id
+	users AS (
+		SELECT * from users
+		WHERE username = username
+	),
+	-- insert kanji into study_queue
+	study_queue_ids AS (
+		INSERT INTO study_queue (user_id, kanji_id)
+		SELECT users.id, char_ids.id FROM char_ids, users
 	)
 	-- insert ids for word <-> kanji(s) relation into kanji_words table
 	INSERT INTO kanji_words (kanji_id, word_id)
@@ -119,7 +129,7 @@ $$ LANGUAGE SQL;
  */
 
 -- EXPLAIN ANALYZE
--- select add_new_user('ian', 'ian');
+select add_new_user('ian', 'ian');
 -- EXPLAIN ANALYZE
 -- select add_new_user('ian', 'ian');
 -- EXPLAIN ANALYZE
@@ -141,11 +151,21 @@ $$ LANGUAGE SQL;
 -- select insert_kanji('本屋さん');
 -- select insert_kanji('大嫌い');
 
+
+
+select insert_kanji('日本語', 'ian');
+select insert_kanji('日曜日', 'ian');
+select insert_kanji('朝日麦酒', 'ian');
+-- select insert_kanji('犬が大好き', 'ian');
+-- select insert_kanji('パソコン', 'ian');
+
 -- select get_related_words_for_kanji('本');
 -- EXPLAIN ANALYZE
 -- select get_related_words_for_kanji('日');
 -- select get_related_words_for_kanji('嫌');
 
--- select * from kanji;
--- select * from words;
--- select * from kanji_words;
+select * from users;
+select * from kanji;
+select * from words;
+select * from kanji_words;
+select * from study_queue;
