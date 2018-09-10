@@ -110,6 +110,23 @@ CREATE OR REPLACE FUNCTION get_related_words_for_kanji(str text) RETURNS SETOF t
 		AND (kanji_words.word_id = words.id);
 $$ LANGUAGE SQL;
 
+DROP FUNCTION IF EXISTS get_next_kanji_to_study(integer) ;
+CREATE OR REPLACE FUNCTION get_next_kanji_to_study(userid integer) RETURNS table(id integer, kanji_id integer) AS $$
+	SELECT sq.id, sq.kanji_id FROM study_queue sq
+		WHERE (sq.user_id = userid)
+		AND (sq.seen = false)
+		ORDER BY sq.id
+		LIMIT 1;
+$$ LANGUAGE SQL;
+
+DROP FUNCTION IF EXISTS mark_next_kanji_to_study_done(integer) ;
+CREATE OR REPLACE FUNCTION mark_next_kanji_to_study_done(userid integer) RETURNS SETOF record AS $$
+	UPDATE study_queue
+	SET seen = true
+	WHERE id IN ( SELECT id from get_next_kanji_to_study(userid) )
+	RETURNING *
+$$ LANGUAGE SQL;
+
 DROP FUNCTION IF EXISTS add_new_user(new_username text, password text) ;
 CREATE OR REPLACE FUNCTION add_new_user(new_username text, password text) RETURNS record AS $$
 	INSERT INTO users (username, password_hash)
