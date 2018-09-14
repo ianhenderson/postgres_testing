@@ -86,6 +86,8 @@ CREATE OR REPLACE FUNCTION kst_kanji_insert(str text, user_id integer) RETURNS V
 	ins_w AS (
 		INSERT INTO words (word)
 		VALUES (str)
+		ON CONFLICT (word)
+		DO UPDATE SET word = EXCLUDED.word
 		RETURNING id
 	),
 	-- get user_id
