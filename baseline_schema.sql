@@ -54,18 +54,18 @@ CREATE TABLE IF NOT EXISTS study_queue (
 /**
  * Helper functions.
  */
-DROP FUNCTION IF EXISTS filter_kanji(text) ;
-CREATE OR REPLACE FUNCTION filter_kanji(str text) RETURNS SETOF text AS $$
+DROP FUNCTION IF EXISTS kst_kanji_filter(text) ;
+CREATE OR REPLACE FUNCTION kst_kanji_filter(str text) RETURNS SETOF text AS $$
 	SELECT unnest( regexp_matches(str, '[\u4e00-\u9faf]', 'g') );
 $$ LANGUAGE SQL;
 
 
-DROP FUNCTION IF EXISTS insert_kanji(str text, username text) ;
-DROP FUNCTION IF EXISTS insert_kanji(str text, user_id integer) ;
-CREATE OR REPLACE FUNCTION insert_kanji(str text, user_id integer) RETURNS VOID AS $$
+DROP FUNCTION IF EXISTS kst_kanji_insert(str text, username text) ;
+DROP FUNCTION IF EXISTS kst_kanji_insert(str text, user_id integer) ;
+CREATE OR REPLACE FUNCTION kst_kanji_insert(str text, user_id integer) RETURNS VOID AS $$
 	-- filter sentence -> kanji only
 	WITH chars AS (
-		SELECT DISTINCT char FROM filter_kanji(str) AS char
+		SELECT DISTINCT char FROM kst_kanji_filter(str) AS char
 	),
 	-- insert kanji into kanji table
 	ins_k AS (
@@ -103,16 +103,16 @@ CREATE OR REPLACE FUNCTION insert_kanji(str text, user_id integer) RETURNS VOID 
 	SELECT char_ids.id, ins_w.id FROM char_ids, ins_w
 $$ LANGUAGE SQL;
 
-DROP FUNCTION IF EXISTS get_related_words_for_kanji(text) ;
-CREATE OR REPLACE FUNCTION get_related_words_for_kanji(str text) RETURNS SETOF text AS $$
+DROP FUNCTION IF EXISTS kst_kanji_get_related_words_for(text) ;
+CREATE OR REPLACE FUNCTION kst_kanji_get_related_words_for(str text) RETURNS SETOF text AS $$
 	SELECT words.word FROM words, kanji, kanji_words
 		WHERE (kanji.kanji = str)
 		AND (kanji_words.kanji_id = kanji.id)
 		AND (kanji_words.word_id = words.id);
 $$ LANGUAGE SQL;
 
-DROP FUNCTION IF EXISTS get_next_kanji_to_study(integer) ;
-CREATE OR REPLACE FUNCTION get_next_kanji_to_study(userid integer) RETURNS table(id integer, kanji_id integer) AS $$
+DROP FUNCTION IF EXISTS kst_kanji_get_next_to_study(integer) ;
+CREATE OR REPLACE FUNCTION kst_kanji_get_next_to_study(userid integer) RETURNS table(id integer, kanji_id integer) AS $$
 	SELECT sq.id, sq.kanji_id FROM study_queue sq
 		WHERE (sq.user_id = userid)
 		AND (sq.seen = false)
@@ -120,23 +120,23 @@ CREATE OR REPLACE FUNCTION get_next_kanji_to_study(userid integer) RETURNS table
 		LIMIT 1;
 $$ LANGUAGE SQL;
 
-DROP FUNCTION IF EXISTS mark_next_kanji_to_study_done(integer) ;
-CREATE OR REPLACE FUNCTION mark_next_kanji_to_study_done(userid integer) RETURNS SETOF record AS $$
+DROP FUNCTION IF EXISTS kst_kanji_mark_next_as_done(integer) ;
+CREATE OR REPLACE FUNCTION kst_kanji_mark_next_as_done(userid integer) RETURNS SETOF record AS $$
 	UPDATE study_queue
 	SET seen = true
-	WHERE id IN ( SELECT id from get_next_kanji_to_study(userid) )
+	WHERE id IN ( SELECT id from kst_kanji_get_next_to_study(userid) )
 	RETURNING *
 $$ LANGUAGE SQL;
 
-DROP FUNCTION IF EXISTS add_new_user(new_username text, password text) ;
-CREATE OR REPLACE FUNCTION add_new_user(new_username text, password text) RETURNS record AS $$
+DROP FUNCTION IF EXISTS kst_user_add(new_username text, password text) ;
+CREATE OR REPLACE FUNCTION kst_user_add(new_username text, password text) RETURNS record AS $$
 	INSERT INTO users (username, password_hash)
 	VALUES ( new_username, crypt(password, gen_salt('bf', 12)) )
 	RETURNING *
 $$ LANGUAGE SQL;
 
-DROP FUNCTION IF EXISTS check_user(name text, password text) ;
-CREATE OR REPLACE FUNCTION check_user(name text, password text) RETURNS SETOF record AS $$
+DROP FUNCTION IF EXISTS kst_user_check(name text, password text) ;
+CREATE OR REPLACE FUNCTION kst_user_check(name text, password text) RETURNS SETOF record AS $$
 	SELECT * FROM users
 		WHERE users.username = name
 		AND users.password_hash = ( crypt(password, users.password_hash) )
@@ -147,43 +147,43 @@ $$ LANGUAGE SQL;
  */
 
 -- EXPLAIN ANALYZE
-select add_new_user('ian', 'ian');
+select kst_user_add('ian', 'ian');
 -- EXPLAIN ANALYZE
--- select add_new_user('ian', 'ian');
+-- select kst_user_add('ian', 'ian');
 -- EXPLAIN ANALYZE
--- select check_user('ian', 'ian');
--- select check_user('ian', 'ian');
--- select check_user('ian', 'ian');
--- select check_user('ian', 'ian');
--- select check_user('ian', 'ian');
--- select check_user('in', 'ia');
+-- select kst_user_check('ian', 'ian');
+-- select kst_user_check('ian', 'ian');
+-- select kst_user_check('ian', 'ian');
+-- select kst_user_check('ian', 'ian');
+-- select kst_user_check('ian', 'ian');
+-- select kst_user_check('in', 'ia');
 -- insert into kanji (kanji) values ('日'),('本'), ('悠');
 
 -- EXPLAIN ANALYZE
--- select insert_kanji('長崎は９日、７２回目の「原爆の日」を迎え、早朝から祈りに包まれた。長崎市の平和公園では平和祈念式典が開かれ、被爆者や遺族ら約５４００人が出席した。田上富久市長は平和宣言で、７月に国連で採択された核兵器禁止条約の交渉会議に参加しなかった日本政府の姿勢を「被爆地は到底理解できない」と厳しく非難し、条約を批准するよう迫った。一方、安倍晋三首相は６日の広島市での平和記念式典でのあいさつと同様、条約に言及しなかった。');
+-- select kst_kanji_insert('長崎は９日、７２回目の「原爆の日」を迎え、早朝から祈りに包まれた。長崎市の平和公園では平和祈念式典が開かれ、被爆者や遺族ら約５４００人が出席した。田上富久市長は平和宣言で、７月に国連で採択された核兵器禁止条約の交渉会議に参加しなかった日本政府の姿勢を「被爆地は到底理解できない」と厳しく非難し、条約を批准するよう迫った。一方、安倍晋三首相は６日の広島市での平和記念式典でのあいさつと同様、条約に言及しなかった。');
 -- EXPLAIN ANALYZE
--- select filter_kanji('長崎は９日、７２回目の「原爆の日」を迎え、早朝から祈りに包まれた。長崎市の平和公園では平和祈念式典が開かれ、被爆者や遺族ら約５４００人が出席した。田上富久市長は平和宣言で、７月に国連で採択された核兵器禁止条約の交渉会議に参加しなかった日本政府の姿勢を「被爆地は到底理解できない」と厳しく非難し、条約を批准するよう迫った。一方、安倍晋三首相は６日の広島市での平和記念式典でのあいさつと同様、条約に言及しなかった。');
--- select insert_kanji('日本語が大好きです');
--- select insert_kanji('日本日本');
--- select insert_kanji('本日');
--- select insert_kanji('本屋さん');
--- select insert_kanji('大嫌い');
+-- select kst_kanji_filter('長崎は９日、７２回目の「原爆の日」を迎え、早朝から祈りに包まれた。長崎市の平和公園では平和祈念式典が開かれ、被爆者や遺族ら約５４００人が出席した。田上富久市長は平和宣言で、７月に国連で採択された核兵器禁止条約の交渉会議に参加しなかった日本政府の姿勢を「被爆地は到底理解できない」と厳しく非難し、条約を批准するよう迫った。一方、安倍晋三首相は６日の広島市での平和記念式典でのあいさつと同様、条約に言及しなかった。');
+-- select kst_kanji_insert('日本語が大好きです');
+-- select kst_kanji_insert('日本日本');
+-- select kst_kanji_insert('本日');
+-- select kst_kanji_insert('本屋さん');
+-- select kst_kanji_insert('大嫌い');
 
 
 
-select insert_kanji('日本語', 1);
-select insert_kanji('日曜日', 1);
-select insert_kanji('朝日麦酒', 1);
--- select insert_kanji('犬が大好き', 'ian');
--- select insert_kanji('パソコン', 'ian');
+select kst_kanji_insert('日本語', 1);
+select kst_kanji_insert('日曜日', 1);
+select kst_kanji_insert('朝日麦酒', 1);
+-- select kst_kanji_insert('犬が大好き', 'ian');
+-- select kst_kanji_insert('パソコン', 'ian');
 
--- select get_related_words_for_kanji('本');
+-- select kst_kanji_get_related_words_for('本');
 -- EXPLAIN ANALYZE
--- select get_related_words_for_kanji('日');
--- select get_related_words_for_kanji('嫌');
+-- select kst_kanji_get_related_words_for('日');
+-- select kst_kanji_get_related_words_for('嫌');
 
-select * from users;
-select * from kanji;
-select * from words;
-select * from kanji_words;
-select * from study_queue;
+table users;
+table kanji;
+table words;
+table kanji_words;
+table study_queue;
