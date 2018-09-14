@@ -61,7 +61,8 @@ $$ LANGUAGE SQL;
 
 
 DROP FUNCTION IF EXISTS insert_kanji(str text, username text) ;
-CREATE OR REPLACE FUNCTION insert_kanji(str text, username text) RETURNS VOID AS $$
+DROP FUNCTION IF EXISTS insert_kanji(str text, user_id integer) ;
+CREATE OR REPLACE FUNCTION insert_kanji(str text, user_id integer) RETURNS VOID AS $$
 	-- filter sentence -> kanji only
 	WITH chars AS (
 		SELECT DISTINCT char FROM filter_kanji(str) AS char
@@ -90,7 +91,7 @@ CREATE OR REPLACE FUNCTION insert_kanji(str text, username text) RETURNS VOID AS
 	-- get user_id
 	users AS (
 		SELECT * from users
-		WHERE username = username
+		WHERE id = user_id
 	),
 	-- insert kanji into study_queue
 	study_queue_ids AS (
@@ -170,9 +171,9 @@ select add_new_user('ian', 'ian');
 
 
 
-select insert_kanji('日本語', 'ian');
-select insert_kanji('日曜日', 'ian');
-select insert_kanji('朝日麦酒', 'ian');
+select insert_kanji('日本語', 1);
+select insert_kanji('日曜日', 1);
+select insert_kanji('朝日麦酒', 1);
 -- select insert_kanji('犬が大好き', 'ian');
 -- select insert_kanji('パソコン', 'ian');
 
