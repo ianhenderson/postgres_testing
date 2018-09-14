@@ -60,9 +60,9 @@ CREATE OR REPLACE FUNCTION kst_kanji_filter(str text) RETURNS SETOF text AS $$
 $$ LANGUAGE SQL;
 
 
-DROP FUNCTION IF EXISTS kst_kanji_insert(str text, username text) ;
-DROP FUNCTION IF EXISTS kst_kanji_insert(str text, user_id integer) ;
-CREATE OR REPLACE FUNCTION kst_kanji_insert(str text, user_id integer) RETURNS VOID AS $$
+DROP FUNCTION IF EXISTS kst_word_insert(str text, username text) ;
+DROP FUNCTION IF EXISTS kst_word_insert(str text, user_id integer) ;
+CREATE OR REPLACE FUNCTION kst_word_insert(str text, user_id integer) RETURNS VOID AS $$
 	-- filter sentence -> kanji only
 	WITH chars AS (
 		SELECT DISTINCT char FROM kst_kanji_filter(str) AS char
@@ -105,44 +105,44 @@ CREATE OR REPLACE FUNCTION kst_kanji_insert(str text, user_id integer) RETURNS V
 	SELECT char_ids.id, ins_w.id FROM char_ids, ins_w
 $$ LANGUAGE SQL;
 
-DROP FUNCTION IF EXISTS kst_kanji_get_related_words_for(text) ;
-CREATE OR REPLACE FUNCTION kst_kanji_get_related_words_for(str text) RETURNS SETOF text AS $$
-	SELECT words.word FROM words, kanji, kanji_words
-		WHERE (kanji.kanji = str)
-		AND (kanji_words.kanji_id = kanji.id)
-		AND (kanji_words.word_id = words.id);
-$$ LANGUAGE SQL;
+-- DROP FUNCTION IF EXISTS kst_kanji_get_related_words_for(text) ;
+-- CREATE OR REPLACE FUNCTION kst_kanji_get_related_words_for(str text) RETURNS SETOF text AS $$
+-- 	SELECT words.word FROM words, kanji, kanji_words
+-- 		WHERE (kanji.kanji = str)
+-- 		AND (kanji_words.kanji_id = kanji.id)
+-- 		AND (kanji_words.word_id = words.id);
+-- $$ LANGUAGE SQL;
 
-DROP FUNCTION IF EXISTS kst_user_get_next_row_to_study(integer) ;
-CREATE OR REPLACE FUNCTION kst_user_get_next_row_to_study(userid integer) RETURNS table(id integer, kanji_id integer) AS $$
-	SELECT sq.id, sq.kanji_id FROM study_queue sq
-		WHERE (sq.user_id = userid)
-		AND (sq.seen = false)
-		ORDER BY sq.id
-		LIMIT 1;
-$$ LANGUAGE SQL;
+-- DROP FUNCTION IF EXISTS kst_user_get_next_row_to_study(integer) ;
+-- CREATE OR REPLACE FUNCTION kst_user_get_next_row_to_study(userid integer) RETURNS table(id integer, kanji_id integer) AS $$
+-- 	SELECT sq.id, sq.kanji_id FROM study_queue sq
+-- 		WHERE (sq.user_id = userid)
+-- 		AND (sq.seen = false)
+-- 		ORDER BY sq.id
+-- 		LIMIT 1;
+-- $$ LANGUAGE SQL;
 
-DROP FUNCTION IF EXISTS kst_user_get_next_char_to_study(integer) ;
-CREATE OR REPLACE FUNCTION kst_user_get_next_char_to_study(userid integer) RETURNS text AS $$
-	SELECT k.kanji from kanji k
-		WHERE k.id = ( SELECT id from kst_user_get_next_row_to_study(userid) )
-$$ LANGUAGE SQL;
+-- DROP FUNCTION IF EXISTS kst_user_get_next_char_to_study(integer) ;
+-- CREATE OR REPLACE FUNCTION kst_user_get_next_char_to_study(userid integer) RETURNS text AS $$
+-- 	SELECT k.kanji from kanji k
+-- 		WHERE k.id = ( SELECT id from kst_user_get_next_row_to_study(userid) )
+-- $$ LANGUAGE SQL;
 
-DROP FUNCTION IF EXISTS kst_user_mark_next_as_done(integer) ;
-CREATE OR REPLACE FUNCTION kst_user_mark_next_as_done(userid integer) RETURNS SETOF record AS $$
-	UPDATE study_queue
-	SET seen = true
-	WHERE id IN ( SELECT id from kst_user_get_next_row_to_study(userid) )
-	RETURNING *
-$$ LANGUAGE SQL;
+-- DROP FUNCTION IF EXISTS kst_user_mark_next_as_done(integer) ;
+-- CREATE OR REPLACE FUNCTION kst_user_mark_next_as_done(userid integer) RETURNS SETOF record AS $$
+-- 	UPDATE study_queue
+-- 	SET seen = true
+-- 	WHERE id IN ( SELECT id from kst_user_get_next_row_to_study(userid) )
+-- 	RETURNING *
+-- $$ LANGUAGE SQL;
 
-DROP FUNCTION IF EXISTS kst_user_get_next_studyrow_full(integer) ;
-CREATE OR REPLACE FUNCTION kst_user_get_next_studyrow_full(userid integer) RETURNS table(next_char text, rel_words text[]) AS $$
-	SELECT next_char, array_agg(words) AS words 
-	FROM kst_user_get_next_char_to_study(userid) next_char, 
-	LATERAL kst_kanji_get_related_words_for(next_char) words 
-	GROUP BY next_char
-$$ LANGUAGE SQL;
+-- DROP FUNCTION IF EXISTS kst_user_get_next_studyrow_full(integer) ;
+-- CREATE OR REPLACE FUNCTION kst_user_get_next_studyrow_full(userid integer) RETURNS table(next_char text, rel_words text[]) AS $$
+-- 	SELECT next_char, array_agg(words) AS words 
+-- 	FROM kst_user_get_next_char_to_study(userid) next_char, 
+-- 	LATERAL kst_kanji_get_related_words_for(next_char) words 
+-- 	GROUP BY next_char
+-- $$ LANGUAGE SQL;
 
 DROP FUNCTION IF EXISTS kst_user_add(new_username text, password text) ;
 CREATE OR REPLACE FUNCTION kst_user_add(new_username text, password text) RETURNS record AS $$
@@ -218,23 +218,23 @@ select kst_user_add('ian', 'ian');
 -- insert into kanji (kanji) values ('日'),('本'), ('悠');
 
 -- EXPLAIN ANALYZE
--- select kst_kanji_insert('長崎は９日、７２回目の「原爆の日」を迎え、早朝から祈りに包まれた。長崎市の平和公園では平和祈念式典が開かれ、被爆者や遺族ら約５４００人が出席した。田上富久市長は平和宣言で、７月に国連で採択された核兵器禁止条約の交渉会議に参加しなかった日本政府の姿勢を「被爆地は到底理解できない」と厳しく非難し、条約を批准するよう迫った。一方、安倍晋三首相は６日の広島市での平和記念式典でのあいさつと同様、条約に言及しなかった。');
+-- select kst_word_insert('長崎は９日、７２回目の「原爆の日」を迎え、早朝から祈りに包まれた。長崎市の平和公園では平和祈念式典が開かれ、被爆者や遺族ら約５４００人が出席した。田上富久市長は平和宣言で、７月に国連で採択された核兵器禁止条約の交渉会議に参加しなかった日本政府の姿勢を「被爆地は到底理解できない」と厳しく非難し、条約を批准するよう迫った。一方、安倍晋三首相は６日の広島市での平和記念式典でのあいさつと同様、条約に言及しなかった。');
 -- EXPLAIN ANALYZE
 -- select kst_kanji_filter('長崎は９日、７２回目の「原爆の日」を迎え、早朝から祈りに包まれた。長崎市の平和公園では平和祈念式典が開かれ、被爆者や遺族ら約５４００人が出席した。田上富久市長は平和宣言で、７月に国連で採択された核兵器禁止条約の交渉会議に参加しなかった日本政府の姿勢を「被爆地は到底理解できない」と厳しく非難し、条約を批准するよう迫った。一方、安倍晋三首相は６日の広島市での平和記念式典でのあいさつと同様、条約に言及しなかった。');
--- select kst_kanji_insert('日本語が大好きです');
--- select kst_kanji_insert('日本日本');
--- select kst_kanji_insert('本日');
--- select kst_kanji_insert('本屋さん');
--- select kst_kanji_insert('大嫌い');
+-- select kst_word_insert('日本語が大好きです');
+-- select kst_word_insert('日本日本');
+-- select kst_word_insert('本日');
+-- select kst_word_insert('本屋さん');
+-- select kst_word_insert('大嫌い');
 
 
 
-select kst_kanji_insert('本校', 1);
-select kst_kanji_insert('日本語', 1);
-select kst_kanji_insert('日曜日', 1);
-select kst_kanji_insert('朝日麦酒', 1);
-select kst_kanji_insert('犬が大好き', 1);
-select kst_kanji_insert('パソコン', 1);
+select kst_word_insert('本校', 1);
+select kst_word_insert('日本語', 1);
+select kst_word_insert('日曜日', 1);
+select kst_word_insert('朝日麦酒', 1);
+select kst_word_insert('犬が大好き', 1);
+select kst_word_insert('パソコン', 1);
 
 -- select kst_kanji_get_related_words_for('本');
 -- EXPLAIN ANALYZE
