@@ -111,8 +111,8 @@ CREATE OR REPLACE FUNCTION kst_kanji_get_related_words_for(str text) RETURNS SET
 		AND (kanji_words.word_id = words.id);
 $$ LANGUAGE SQL;
 
-DROP FUNCTION IF EXISTS kst_kanji_get_next_to_study(integer) ;
-CREATE OR REPLACE FUNCTION kst_kanji_get_next_to_study(userid integer) RETURNS table(id integer, kanji_id integer) AS $$
+DROP FUNCTION IF EXISTS kst_user_get_next_row_to_study(integer) ;
+CREATE OR REPLACE FUNCTION kst_user_get_next_row_to_study(userid integer) RETURNS table(id integer, kanji_id integer) AS $$
 	SELECT sq.id, sq.kanji_id FROM study_queue sq
 		WHERE (sq.user_id = userid)
 		AND (sq.seen = false)
@@ -120,12 +120,26 @@ CREATE OR REPLACE FUNCTION kst_kanji_get_next_to_study(userid integer) RETURNS t
 		LIMIT 1;
 $$ LANGUAGE SQL;
 
-DROP FUNCTION IF EXISTS kst_kanji_mark_next_as_done(integer) ;
-CREATE OR REPLACE FUNCTION kst_kanji_mark_next_as_done(userid integer) RETURNS SETOF record AS $$
+DROP FUNCTION IF EXISTS kst_user_get_next_char_to_study(integer) ;
+CREATE OR REPLACE FUNCTION kst_user_get_next_char_to_study(userid integer) RETURNS text AS $$
+	SELECT k.kanji from kanji k
+		WHERE k.id = ( SELECT id from kst_user_get_next_row_to_study(userid) )
+$$ LANGUAGE SQL;
+
+DROP FUNCTION IF EXISTS kst_user_mark_next_as_done(integer) ;
+CREATE OR REPLACE FUNCTION kst_user_mark_next_as_done(userid integer) RETURNS SETOF record AS $$
 	UPDATE study_queue
 	SET seen = true
-	WHERE id IN ( SELECT id from kst_kanji_get_next_to_study(userid) )
+	WHERE id IN ( SELECT id from kst_user_get_next_row_to_study(userid) )
 	RETURNING *
+$$ LANGUAGE SQL;
+
+DROP FUNCTION IF EXISTS kst_user_get_next_studyrow_full(integer) ;
+CREATE OR REPLACE FUNCTION kst_user_get_next_studyrow_full(userid integer) RETURNS table(next_char text, rel_words text[]) AS $$
+	SELECT next_char, array_agg(words) AS words 
+	FROM kst_user_get_next_char_to_study(userid) next_char, 
+	LATERAL kst_kanji_get_related_words_for(next_char) words 
+	GROUP BY next_char
 $$ LANGUAGE SQL;
 
 DROP FUNCTION IF EXISTS kst_user_add(new_username text, password text) ;
@@ -171,11 +185,12 @@ select kst_user_add('ian', 'ian');
 
 
 
+select kst_kanji_insert('本校', 1);
 select kst_kanji_insert('日本語', 1);
 select kst_kanji_insert('日曜日', 1);
 select kst_kanji_insert('朝日麦酒', 1);
--- select kst_kanji_insert('犬が大好き', 'ian');
--- select kst_kanji_insert('パソコン', 'ian');
+select kst_kanji_insert('犬が大好き', 1);
+select kst_kanji_insert('パソコン', 1);
 
 -- select kst_kanji_get_related_words_for('本');
 -- EXPLAIN ANALYZE
