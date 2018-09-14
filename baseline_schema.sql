@@ -158,6 +158,48 @@ CREATE OR REPLACE FUNCTION kst_user_check(name text, password text) RETURNS SETO
 		AND users.password_hash = ( crypt(password, users.password_hash) )
 $$ LANGUAGE SQL;
 
+-- v2 Functions
+-- Will deprecate:
+-- 	kst_kanji_get_related_words_for
+-- 	kst_user_get_next_row_to_study
+-- 	kst_user_get_next_char_to_study
+-- 	kst_user_mark_next_as_done
+-- 	kst_user_get_next_studyrow_full
+DROP FUNCTION IF EXISTS kst_user_get_next_row_to_study_v2(integer) ;
+CREATE OR REPLACE FUNCTION kst_user_get_next_row_to_study_v2(userid integer) RETURNS table(queue_id integer, next_char text, rel_words text[]) AS $$
+	WITH next_study_row AS (
+		SELECT * FROM study_queue sq
+			WHERE (sq.user_id = userid)
+			AND (sq.seen = false)
+			ORDER BY sq.id
+			LIMIT 1
+	)
+	SELECT
+		nsr.id as queue_id,
+		k.kanji as next_char,
+		array_agg(DISTINCT w.word) as rel_words
+	FROM
+		users u,
+		kanji k,
+		words w,
+		kanji_words kw,
+		next_study_row nsr
+	WHERE (u.id = userid)
+	AND (k.id = nsr.kanji_id)
+	AND (kw.kanji_id = k.id)
+	AND (kw.word_id = w.id)
+	GROUP BY next_char, queue_id;
+$$ LANGUAGE SQL;
+
+DROP FUNCTION IF EXISTS kst_queue_markdone(integer) ;
+CREATE OR REPLACE FUNCTION kst_queue_markdone(queue_id integer) RETURNS SETOF record AS $$
+	UPDATE study_queue sq
+	SET seen = true
+	WHERE (sq.id = queue_id)
+	RETURNING *
+$$ LANGUAGE SQL;
+
+
 /**
  * Dummy data.
  */
