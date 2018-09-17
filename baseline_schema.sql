@@ -54,6 +54,37 @@ CREATE OR REPLACE FUNCTION kst.kst_kanji_filter(str text) RETURNS SETOF text AS 
 $$ LANGUAGE SQL;
 
 
+CREATE OR REPLACE FUNCTION kst.kst_word_insert_v2(str text, user_id integer) RETURNS VOID AS $$
+	-- filter sentence -> kanji only
+	WITH chars AS (
+		SELECT DISTINCT char FROM kst.kst_kanji_filter(str) AS char
+	),
+	-- upsert kanji into kanji table
+	char_ids AS (
+		INSERT INTO kst.kanji (kanji)
+		SELECT char FROM chars
+		ON CONFLICT (kanji)
+		DO UPDATE SET kanji = EXCLUDED.kanji
+		RETURNING id
+	),
+	-- upsert word into words table
+	word_ids AS (
+		INSERT INTO kst.words (word)
+		VALUES (str)
+		ON CONFLICT (word)
+		DO UPDATE SET word = EXCLUDED.word
+		RETURNING id
+	),
+	-- insert kanji into study_queue
+	study_queue_ids AS (
+		INSERT INTO kst.study_queue (user_id, kanji_id)
+		SELECT user_id, char_ids.id FROM char_ids
+	)
+	-- insert ids for word <-> kanji(s) relation into kanji_words table
+	INSERT INTO kst.kanji_words (kanji_id, word_id)
+	SELECT char_ids.id, word_ids.id FROM char_ids, word_ids
+$$ LANGUAGE SQL;
+
 CREATE OR REPLACE FUNCTION kst.kst_word_insert(str text, user_id integer) RETURNS VOID AS $$
 	-- filter sentence -> kanji only
 	WITH chars AS (
@@ -110,16 +141,22 @@ CREATE OR REPLACE FUNCTION kst.kst_user_check(name text, password text) RETURNS 
 $$ LANGUAGE SQL;
 
 -- v2 Functions
-CREATE OR REPLACE FUNCTION kst.kst_user_get_next_row_to_study_v2(userid integer) RETURNS table(queue_id integer, next_char text, rel_words text[]) AS $$
+CREATE OR REPLACE FUNCTION kst.kst_user_get_next_row_to_study_v2(userid integer) RETURNS table(queue_id integer, total_unseen bigint, next_char text, rel_words text[]) AS $$
 	WITH next_study_row AS (
 		SELECT * FROM kst.study_queue sq
 			WHERE (sq.user_id = userid)
 			AND (sq.seen = false)
 			ORDER BY sq.id
 			LIMIT 1
+	),
+	total_unseen AS (
+		SELECT count(*) FROM kst.study_queue sq
+			WHERE (sq.user_id = userid)
+			AND (sq.seen = false)
 	)
 	SELECT
 		nsr.id as queue_id,
+		tu.count as total_unseen,
 		k.kanji as next_char,
 		array_agg(DISTINCT w.word) as rel_words
 	FROM
@@ -127,12 +164,13 @@ CREATE OR REPLACE FUNCTION kst.kst_user_get_next_row_to_study_v2(userid integer)
 		kst.kanji k,
 		kst.words w,
 		kst.kanji_words kw,
+		total_unseen tu,
 		next_study_row nsr
 	WHERE (u.id = userid)
 	AND (k.id = nsr.kanji_id)
 	AND (kw.kanji_id = k.id)
 	AND (kw.word_id = w.id)
-	GROUP BY next_char, queue_id;
+	GROUP BY next_char, queue_id, total_unseen;
 $$ LANGUAGE SQL;
 
 CREATE OR REPLACE FUNCTION kst.kst_queue_markdone(queue_id integer) RETURNS SETOF record AS $$
