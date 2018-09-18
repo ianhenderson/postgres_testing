@@ -27,17 +27,9 @@ CREATE TABLE IF NOT EXISTS kst.words (
 	word text UNIQUE
 ) ;
 CREATE TABLE IF NOT EXISTS kst.kanji_words (
-	id SERIAL PRIMARY KEY,
 	kanji_id integer REFERENCES kst.kanji,
-	word_id integer REFERENCES kst.words
-) ;
-CREATE TABLE IF NOT EXISTS kst.seen_words (
-	id SERIAL PRIMARY KEY,
-	word_id integer REFERENCES kst.words
-) ;
-CREATE TABLE IF NOT EXISTS kst.seen_kanji (
-	id SERIAL PRIMARY KEY,
-	kanji_id integer REFERENCES kst.kanji
+	word_id integer REFERENCES kst.words,
+	PRIMARY KEY (kanji_id, word_id)
 ) ;
 CREATE TABLE IF NOT EXISTS kst.study_queue (
 	id SERIAL PRIMARY KEY,
@@ -83,6 +75,7 @@ CREATE OR REPLACE FUNCTION kst.kst_word_insert_v2(str text, user_id integer) RET
 	-- insert ids for word <-> kanji(s) relation into kanji_words table
 	INSERT INTO kst.kanji_words (kanji_id, word_id)
 	SELECT char_ids.id, word_ids.id FROM char_ids, word_ids
+	ON CONFLICT DO NOTHING
 $$ LANGUAGE SQL;
 
 CREATE OR REPLACE FUNCTION kst.kst_word_insert(str text, user_id integer) RETURNS VOID AS $$
